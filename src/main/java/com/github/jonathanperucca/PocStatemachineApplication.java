@@ -1,15 +1,13 @@
 package com.github.jonathanperucca;
 
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.annotation.WithStateMachine;
+import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
@@ -18,6 +16,7 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
 import org.springframework.statemachine.listener.StateMachineListener;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.state.State;
+import org.springframework.stereotype.Service;
 
 import java.util.EnumSet;
 
@@ -41,10 +40,35 @@ public class PocStatemachineApplication implements CommandLineRunner {
         stateMachine.sendEvent(EXCHANGE_ENDED);
     }
 
+    @Service
+    static class ExchangeService {
+
+        public void onEnterAccept() {
+            System.out.println("ExchangeService : set status = " + READY);
+        }
+
+        public void onExitAccept() {
+            System.out.println("ExchangeService : leaving status " + READY);
+        }
+    }
+
 
     @Configuration
     @EnableStateMachine
     static class StateMachineConfig extends EnumStateMachineConfigurerAdapter<States, Events> {
+
+        @Autowired
+        ExchangeService exchangeService;
+
+        @Bean
+        public Action<States, Events> enterAccept() {
+            return context -> exchangeService.onEnterAccept();
+        }
+
+        @Bean
+        public Action<States, Events> exitAccept() {
+            return context -> exchangeService.onExitAccept();
+        }
 
         @Override
         public void configure(StateMachineConfigurationConfigurer<States, Events> config)
@@ -75,18 +99,18 @@ public class PocStatemachineApplication implements CommandLineRunner {
 
         @Override
         public void configure(StateMachineTransitionConfigurer<States, Events> transitions) throws Exception {
-            transitions.withExternal()
-                       .source(PENDING).target(READY).event(ACCEPT)
-                       .and().withExternal()
-                       .source(PENDING).target(CANCEL).event(OWNER_REFUSAL)
-                       .and().withExternal()
-                       .source(PENDING).target(CANCEL).event(RECEIVER_CANCELLATION)
-                       .and().withExternal()
-                       .source(PENDING).target(CANCEL).event(SYSTEM_CANCELLATION)
-                       .and().withExternal()
-                       .source(READY).target(IN_PROGRESS).event(EXCHANGE_STARTED)
-                       .and().withExternal()
-                       .source(IN_PROGRESS).target(WAITING_END).event(EXCHANGE_ENDED);
+            transitions
+                    .withExternal().source(PENDING).target(READY).event(ACCEPT).action(enterAccept()).action(exitAccept())
+                    .and()
+                    .withExternal().source(PENDING).target(CANCEL).event(OWNER_REFUSAL)
+                    .and()
+                    .withExternal().source(PENDING).target(CANCEL).event(RECEIVER_CANCELLATION)
+                    .and()
+                    .withExternal().source(PENDING).target(CANCEL).event(SYSTEM_CANCELLATION)
+                    .and()
+                    .withExternal().source(READY).target(IN_PROGRESS).event(EXCHANGE_STARTED)
+                    .and()
+                    .withExternal().source(IN_PROGRESS).target(WAITING_END).event(EXCHANGE_ENDED);
         }
     }
 
