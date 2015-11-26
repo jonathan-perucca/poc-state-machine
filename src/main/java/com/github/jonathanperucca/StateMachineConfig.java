@@ -31,29 +31,14 @@ import static com.github.jonathanperucca.model.Events.*;
 @EnableStateMachine
 public class StateMachineConfig extends EnumStateMachineConfigurerAdapter<States, Events> {
 
-    @Autowired
-    ExchangeService exchangeService;
 
-    AtomicInteger atomicInteger = new AtomicInteger();
-
-    @WithStateMachine
-    @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-    public Exchange exchange(StateMachine<States, Events> stateMachine) {
-        String id = stateMachine.getId();
-        State<States, Events> state = stateMachine.getState();
-        return new Exchange(String.valueOf("xch-prd-" + atomicInteger.incrementAndGet()), id, state.getId());
-    }
-
-    @Bean
-    public Action<States, Events> enterAccept() {
-        return context -> exchangeService.onEnterAccept();
-    }
-
-    @Bean
-    public Action<States, Events> exitAccept() {
-        return context -> exchangeService.onExitAccept();
-    }
+//    AtomicInteger atomicInteger = new AtomicInteger();
+//
+//    @Bean
+//    public Exchange exchange(StateMachine<States, Events> stateMachine) {
+//        State<States, Events> state = stateMachine.getState();
+//        return new Exchange(String.valueOf("xch-prd-" + atomicInteger.incrementAndGet()), state.getId());
+//    }
 
     @Override
     public void configure(StateMachineConfigurationConfigurer<States, Events> config)
@@ -85,7 +70,7 @@ public class StateMachineConfig extends EnumStateMachineConfigurerAdapter<States
     @Override
     public void configure(StateMachineTransitionConfigurer<States, Events> transitions) throws Exception {
         transitions
-                .withExternal().source(PENDING).target(READY).event(ACCEPT).action(enterAccept()).action(exitAccept())
+                .withExternal().source(PENDING).target(READY).event(ACCEPT)
                 .and()
                 .withExternal().source(PENDING).target(CANCEL).event(OWNER_REFUSAL)
                 .and()

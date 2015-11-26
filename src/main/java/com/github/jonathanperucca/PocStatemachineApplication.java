@@ -4,12 +4,20 @@ import com.github.jonathanperucca.model.Events;
 import com.github.jonathanperucca.model.Exchange;
 import com.github.jonathanperucca.model.States;
 import com.github.jonathanperucca.service.AnotherService;
+import com.github.jonathanperucca.service.ExchangeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.StateMachine;
+import org.springframework.statemachine.state.State;
+import org.springframework.statemachine.support.StateMachineInterceptor;
+import org.springframework.statemachine.transition.Transition;
 
 import static com.github.jonathanperucca.model.Events.*;
 
@@ -21,30 +29,56 @@ public class PocStatemachineApplication implements CommandLineRunner {
     }
 
     @Autowired
-    StateMachine<States, Events> stateMachine;
-
-    @Autowired
     AnotherService anotherService;
 
     @Autowired
-    ApplicationContext context;
+    ExchangeService exchangeService;
 
     @Override
     public void run(String... args) throws Exception {
-        Exchange exchange = context.getBean(Exchange.class);
-        System.out.println(exchange);
+        exchangeService.showDB();
+
+        String uuid = "xch-prd-1";
+        String uuid2 = "xch-prd-2";
+        Exchange exchange = exchangeService.getExchange(uuid);
+
+        Message<Events> message = MessageBuilder
+                .withPayload(Events.ACCEPT)
+                .setHeaderIfAbsent("exchange", exchange)
+                .build();
+
+        exchangeService.handleEvent(message);
+
+        exchangeService.showDB();
 
         anotherService.doRequestStateMachine();
 
-        stateMachine.sendEvent(ACCEPT);
+        message = MessageBuilder
+                .withPayload(Events.EXCHANGE_STARTED)
+                .setHeaderIfAbsent("exchange", exchange)
+                .build();
+
+        exchangeService.handleEvent(message);
+
+        exchangeService.showDB();
 
         anotherService.doRequestStateMachine();
 
-        stateMachine.sendEvent(EXCHANGE_STARTED);
+        // Now - Use second exchange update against stateMachine
+
+        Exchange exchange2 = exchangeService.getExchange(uuid2);
+        message = MessageBuilder
+                .withPayload(ACCEPT)
+                .setHeaderIfAbsent("exchange", exchange2)
+                .build();
+
+        exchangeService.handleEvent(message);
+
+        exchangeService.showDB();
 
         anotherService.doRequestStateMachine();
 
-        stateMachine.sendEvent(EXCHANGE_ENDED);
+//        stateMachine.sendEvent(EXCHANGE_ENDED);
     }
 
 }
