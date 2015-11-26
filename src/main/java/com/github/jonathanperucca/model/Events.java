@@ -1,0 +1,6 @@
+package com.github.jonathanperucca.model;
+
+public enum Events {
+    ACCEPT, EXCHANGE_STARTED, EXCHANGE_ENDED,
+    OWNER_REFUSAL, OWNER_CANCELLATION, RECEIVER_CANCELLATION, SYSTEM_CANCELLATION,
+}

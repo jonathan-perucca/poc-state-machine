@@ -1,27 +1,17 @@
 package com.github.jonathanperucca;
 
+import com.github.jonathanperucca.model.Events;
+import com.github.jonathanperucca.model.Exchange;
+import com.github.jonathanperucca.model.States;
+import com.github.jonathanperucca.service.AnotherService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.ApplicationContext;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.action.Action;
-import org.springframework.statemachine.config.EnableStateMachine;
-import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
-import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
-import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
-import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
-import org.springframework.statemachine.listener.StateMachineListener;
-import org.springframework.statemachine.listener.StateMachineListenerAdapter;
-import org.springframework.statemachine.state.State;
-import org.springframework.stereotype.Service;
 
-import java.util.EnumSet;
-
-import static com.github.jonathanperucca.PocStatemachineApplication.Events.*;
-import static com.github.jonathanperucca.PocStatemachineApplication.States.*;
+import static com.github.jonathanperucca.model.Events.*;
 
 @SpringBootApplication
 public class PocStatemachineApplication implements CommandLineRunner {
@@ -31,95 +21,30 @@ public class PocStatemachineApplication implements CommandLineRunner {
     }
 
     @Autowired
-    StateMachine<State, Events> stateMachine;
+    StateMachine<States, Events> stateMachine;
+
+    @Autowired
+    AnotherService anotherService;
+
+    @Autowired
+    ApplicationContext context;
 
     @Override
     public void run(String... args) throws Exception {
+        Exchange exchange = context.getBean(Exchange.class);
+        System.out.println(exchange);
+
+        anotherService.doRequestStateMachine();
+
         stateMachine.sendEvent(ACCEPT);
+
+        anotherService.doRequestStateMachine();
+
         stateMachine.sendEvent(EXCHANGE_STARTED);
+
+        anotherService.doRequestStateMachine();
+
         stateMachine.sendEvent(EXCHANGE_ENDED);
     }
 
-    @Service
-    static class ExchangeService {
-
-        public void onEnterAccept() {
-            System.out.println("ExchangeService : set status = " + READY);
-        }
-
-        public void onExitAccept() {
-            System.out.println("ExchangeService : leaving status " + READY);
-        }
-    }
-
-
-    @Configuration
-    @EnableStateMachine
-    static class StateMachineConfig extends EnumStateMachineConfigurerAdapter<States, Events> {
-
-        @Autowired
-        ExchangeService exchangeService;
-
-        @Bean
-        public Action<States, Events> enterAccept() {
-            return context -> exchangeService.onEnterAccept();
-        }
-
-        @Bean
-        public Action<States, Events> exitAccept() {
-            return context -> exchangeService.onExitAccept();
-        }
-
-        @Override
-        public void configure(StateMachineConfigurationConfigurer<States, Events> config)
-                throws Exception {
-            config
-                    .withConfiguration()
-                    .autoStartup(true)
-                    .listener(listener());
-        }
-
-        @Bean
-        public StateMachineListener<States, Events> listener() {
-            return new StateMachineListenerAdapter<States, Events>() {
-                @Override
-                public void stateChanged(State<States, Events> from, State<States, Events> to) {
-                    System.out.println("State change to " + to.getId());
-                }
-            };
-        }
-
-        @Override
-        public void configure(StateMachineStateConfigurer<States, Events> states) throws Exception {
-            states.withStates()
-                    .initial(PENDING)
-                    .end(WAITING_END)
-                    .states(EnumSet.allOf(States.class));
-        }
-
-        @Override
-        public void configure(StateMachineTransitionConfigurer<States, Events> transitions) throws Exception {
-            transitions
-                    .withExternal().source(PENDING).target(READY).event(ACCEPT).action(enterAccept()).action(exitAccept())
-                    .and()
-                    .withExternal().source(PENDING).target(CANCEL).event(OWNER_REFUSAL)
-                    .and()
-                    .withExternal().source(PENDING).target(CANCEL).event(RECEIVER_CANCELLATION)
-                    .and()
-                    .withExternal().source(PENDING).target(CANCEL).event(SYSTEM_CANCELLATION)
-                    .and()
-                    .withExternal().source(READY).target(IN_PROGRESS).event(EXCHANGE_STARTED)
-                    .and()
-                    .withExternal().source(IN_PROGRESS).target(WAITING_END).event(EXCHANGE_ENDED);
-        }
-    }
-
-    public static enum States {
-        PENDING, READY, CANCEL, IN_PROGRESS, WAITING_END
-    }
-
-    public static enum Events {
-        ACCEPT, EXCHANGE_STARTED, EXCHANGE_ENDED,
-        OWNER_REFUSAL, OWNER_CANCELLATION, RECEIVER_CANCELLATION, SYSTEM_CANCELLATION,
-    }
 }
