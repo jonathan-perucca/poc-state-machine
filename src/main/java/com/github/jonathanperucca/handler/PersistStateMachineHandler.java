@@ -2,10 +2,10 @@ package com.github.jonathanperucca.handler;
 
 import com.github.jonathanperucca.model.Events;
 import com.github.jonathanperucca.model.States;
+import com.github.jonathanperucca.service.BusinessStateMachineException;
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.access.StateMachineAccess;
-import org.springframework.statemachine.access.StateMachineFunction;
 import org.springframework.statemachine.listener.AbstractCompositeListener;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
@@ -58,8 +58,15 @@ public class PersistStateMachineHandler extends LifecycleObjectSupport {
 		for (StateMachineAccess<States, Events> a : withAllRegions) {
 			a.resetStateMachine(new DefaultStateMachineContext<>(state, null, null, null));
 		}
+		stateMachine.setStateMachineError(null);
 		stateMachine.start();
-		return stateMachine.sendEvent(event);
+		boolean eventAccepted = stateMachine.sendEvent(event);
+
+		if(!eventAccepted) {
+			throw new BusinessStateMachineException("Event not accepted by state machine");
+		}
+
+		return true;
 	}
 
 	/**
@@ -92,6 +99,8 @@ public class PersistStateMachineHandler extends LifecycleObjectSupport {
 		 */
 		void onPersist(State<States,Events> state, Message<Events> message, Transition<States,Events> transition,
 				StateMachine<States,Events> stateMachine);
+
+		void onError(Exception exception);
 	}
 
 	private class PersistingStateChangeInterceptor extends StateMachineInterceptorAdapter<States,Events> {
@@ -99,6 +108,12 @@ public class PersistStateMachineHandler extends LifecycleObjectSupport {
 		@Override
 		public void postStateChange(State<States, Events> state, Message<Events> message, Transition<States, Events> transition, StateMachine<States, Events> stateMachine) {
 			listeners.onPersist(state, message, transition, stateMachine);
+		}
+
+		@Override
+		public Exception stateMachineError(StateMachine<States, Events> stateMachine, Exception exception) {
+			listeners.onError(exception);
+			return exception;
 		}
 	}
 
@@ -111,6 +126,14 @@ public class PersistStateMachineHandler extends LifecycleObjectSupport {
 			for (Iterator<PersistStateChangeListener> iterator = getListeners().reverse(); iterator.hasNext();) {
 				PersistStateChangeListener listener = iterator.next();
 				listener.onPersist(state, message, transition, stateMachine);
+			}
+		}
+
+		@Override
+		public void onError(Exception exception) {
+			for (Iterator<PersistStateChangeListener> iterator = getListeners().reverse(); iterator.hasNext();) {
+				PersistStateChangeListener listener = iterator.next();
+				listener.onError(exception);
 			}
 		}
 	}

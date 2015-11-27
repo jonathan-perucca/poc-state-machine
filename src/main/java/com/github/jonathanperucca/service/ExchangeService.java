@@ -8,7 +8,6 @@ import com.github.jonathanperucca.model.States;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.StateMachine;
-import org.springframework.statemachine.processor.StateMachineHandler;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.stereotype.Service;
@@ -47,9 +46,14 @@ public class ExchangeService {
         System.out.println("ExchangeService : leaving status " + READY);
     }
 
-    public void handleEvent(Message<Events> message) {
+    public boolean handleEvent(Message<Events> message) {
         Exchange exchange = message.getHeaders().get(exchangeHeader, Exchange.class);
-        handler.handleEventWithState(message, exchange.getCurrentState());
+        try {
+            return handler.handleEventWithState(message, exchange.getCurrentState());
+        } catch (BusinessStateMachineException e) {
+            System.out.println(e.getMessage());
+            return false;
+        }
     }
 
     public void showDB() {
@@ -71,6 +75,11 @@ public class ExchangeService {
                 exchange.setCurrentState(state.getId());
                 exchangeDB.put(exchange.getUuid(), exchange);
             }
+        }
+
+        @Override
+        public void onError(Exception exception) {
+            throw new BusinessStateMachineException("StateMachine added a business exception", exception);
         }
     }
 }

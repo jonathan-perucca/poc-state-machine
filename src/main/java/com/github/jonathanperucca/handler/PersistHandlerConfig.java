@@ -2,6 +2,7 @@ package com.github.jonathanperucca.handler;
 
 import com.github.jonathanperucca.model.Events;
 import com.github.jonathanperucca.model.States;
+import com.github.jonathanperucca.service.ActionService;
 import com.github.jonathanperucca.service.ExchangeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -15,6 +16,11 @@ public class PersistHandlerConfig {
     private StateMachine<States, Events> stateMachine;
 
     @Bean
+    public ActionService actionService() {
+        return new ActionService();
+    }
+
+    @Bean
     public ExchangeService exchangeService() {
         return new ExchangeService(persistStateMachineHandler());
     }
@@ -23,4 +29,5 @@ public class PersistHandlerConfig {
     public PersistStateMachineHandler persistStateMachineHandler() {
         return new PersistStateMachineHandler(stateMachine);
     }
+
 }

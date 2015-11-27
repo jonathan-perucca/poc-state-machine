@@ -66,19 +66,44 @@ public class PocStatemachineApplication implements CommandLineRunner {
 
         // Now - Use second exchange update against stateMachine
 
+        // PENDING
         Exchange exchange2 = exchangeService.getExchange(uuid2);
         message = MessageBuilder
                 .withPayload(ACCEPT)
                 .setHeaderIfAbsent("exchange", exchange2)
                 .build();
 
-        exchangeService.handleEvent(message);
+        // PENDING -> READY
+        boolean eventAccepted = exchangeService.handleEvent(message);
+
+        System.out.println("Event accepted : " + eventAccepted);
 
         exchangeService.showDB();
 
         anotherService.doRequestStateMachine();
 
-//        stateMachine.sendEvent(EXCHANGE_ENDED);
+        // ACCEPT when exchange is READY should not be accepted
+
+        message = MessageBuilder
+                .withPayload(ACCEPT)
+                .setHeaderIfAbsent("exchange", exchange2)
+                .build();
+
+        eventAccepted = exchangeService.handleEvent(message);
+
+        System.out.println("Event accepted : " + eventAccepted);
+
+
+        // Guard is set on transition (READY -> IN_PROGRESS)
+        // it checks if strange is true, then throw BusinessStateMachineException
+        exchange2.setStrange(true);
+
+        message = MessageBuilder
+                .withPayload(EXCHANGE_STARTED)
+                .setHeaderIfAbsent("exchange", exchange2)
+                .build();
+
+        exchangeService.handleEvent(message);
     }
 
 }
