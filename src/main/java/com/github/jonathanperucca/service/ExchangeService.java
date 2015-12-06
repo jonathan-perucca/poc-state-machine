@@ -54,7 +54,7 @@ public class ExchangeService {
                 .apply(request);
     }
 
-    private Function<HandleEventRequest, HandleEventRequest> extractExchange() {
+    protected Function<HandleEventRequest, HandleEventRequest> extractExchange() {
         return (request) -> {
             Exchange exchange = request.getMessage().getHeaders().get(exchangeHeader, Exchange.class);
 
@@ -63,7 +63,7 @@ public class ExchangeService {
         };
     }
 
-    private Boolean delegateMessageToHandler(HandleEventRequest request) {
+    protected Boolean delegateMessageToHandler(HandleEventRequest request) {
         try {
             return handler.handleEventWithState(request.getMessage(), request.getExchange().getCurrentState());
         } catch (BusinessStateMachineException e) {
