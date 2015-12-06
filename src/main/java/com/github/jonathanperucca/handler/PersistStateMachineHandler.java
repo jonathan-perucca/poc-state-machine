@@ -3,6 +3,9 @@ package com.github.jonathanperucca.handler;
 import com.github.jonathanperucca.model.Events;
 import com.github.jonathanperucca.model.States;
 import com.github.jonathanperucca.exception.BusinessStateMachineException;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.access.StateMachineAccess;
@@ -14,10 +17,8 @@ import org.springframework.statemachine.support.StateMachineInterceptorAdapter;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.util.Assert;
 
-import java.awt.*;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.function.Function;
 
 /**
@@ -41,43 +42,57 @@ public class PersistStateMachineHandler extends LifecycleObjectSupport {
 		stateMachine.getStateMachineAccessor().doWithAllRegions(function -> function.addStateMachineInterceptor(interceptor));
 	}
 
-	public void addPersistStateChangeListener(PersistStateChangeListener listener) {
-		listeners.register(listener);
+	/**
+	 * HandleEventWithState
+	 */
+
+	@Getter @Setter @Builder
+	static class HandleEventWithStateRequest {
+		private Message<Events> message;
+		private States state;
 	}
 
-	public boolean handleEventWithState(Message<Events> event, States state) {
-		return reinitializeTo(event)
+	public boolean handleEventWithState(Message<Events> message, States state) {
+		HandleEventWithStateRequest request = HandleEventWithStateRequest.builder().message(message).state(state).build();
+
+		return reinitializeTo()
 				.andThen(this::sendEventToStateMachine)
-				.apply(state);
+				.apply(request);
 	}
 
-
-	private Function<States, Message<Events>> reinitializeTo(Message<Events> event) {
-		return (States state) -> {
+	private Function<HandleEventWithStateRequest, HandleEventWithStateRequest> reinitializeTo() {
+		return (request) -> {
 			stateMachine.stop();
 			List<StateMachineAccess<States, Events>> withAllRegions = stateMachine.getStateMachineAccessor()
 																				  .withAllRegions();
 			for (StateMachineAccess<States, Events> a : withAllRegions) {
-				a.resetStateMachine(new DefaultStateMachineContext<>(state, null, null, null));
+				a.resetStateMachine(new DefaultStateMachineContext<>(request.getState(), null, null, null));
 			}
 			resetStateMachineErrors();
 			stateMachine.start();
-			return event;
+			return request;
 		};
 	}
 
-	private Boolean sendEventToStateMachine(Message<Events> message) {
-		boolean eventAccepted = stateMachine.sendEvent(message);
+	private Boolean sendEventToStateMachine(HandleEventWithStateRequest request) {
+		boolean eventAccepted = stateMachine.sendEvent(request.getMessage());
 
 		if(!eventAccepted) {
 			throw new BusinessStateMachineException("Event not accepted by state machine");
 		}
-
 		return true;
 	}
 
+	/**
+	 * end HandleEventWithState
+	 */
+
 	private void resetStateMachineErrors() {
 		stateMachine.setStateMachineError(null);
+	}
+
+	public void addPersistStateChangeListener(PersistStateChangeListener listener) {
+		listeners.register(listener);
 	}
 
 

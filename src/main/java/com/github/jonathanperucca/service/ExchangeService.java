@@ -6,12 +6,17 @@ import com.github.jonathanperucca.handler.PersistStateMachineHandler;
 import com.github.jonathanperucca.model.Events;
 import com.github.jonathanperucca.model.Exchange;
 import com.github.jonathanperucca.model.States;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.Message;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.stereotype.Service;
+
+import java.util.function.Function;
 
 @Service
 public class ExchangeService {
@@ -27,22 +32,49 @@ public class ExchangeService {
         this.handler.addPersistStateChangeListener(new MemPersistStateChangeListener());
     }
 
+    public Exchange getExchange(String uuid) {
+        return mapDB.getExchange(uuid);
+    }
+
+    /**
+     * handleEvent
+     */
+
+    @Getter @Setter @Builder
+    static class HandleEventRequest {
+        private Message<Events> message;
+        private Exchange exchange;
+    }
+
     public boolean handleEvent(Message<Events> message) {
-        Exchange exchange = message.getHeaders().get(exchangeHeader, Exchange.class);
+        HandleEventRequest request = HandleEventRequest.builder().message(message).build();
+
+        return extractExchange()
+                .andThen(this::delegateMessageToHandler)
+                .apply(request);
+    }
+
+    private Function<HandleEventRequest, HandleEventRequest> extractExchange() {
+        return (request) -> {
+            Exchange exchange = request.getMessage().getHeaders().get(exchangeHeader, Exchange.class);
+
+            request.setExchange(exchange);
+            return request;
+        };
+    }
+
+    private Boolean delegateMessageToHandler(HandleEventRequest request) {
         try {
-            return handler.handleEventWithState(message, exchange.getCurrentState());
+            return handler.handleEventWithState(request.getMessage(), request.getExchange().getCurrentState());
         } catch (BusinessStateMachineException e) {
             return false;
         }
     }
 
-    public Exchange getExchange(String uuid) {
-        return mapDB.getExchange(uuid);
-    }
+    /**
+     * end handleEvent
+     */
 
-    public void showDB() {
-        mapDB.showDB();
-    }
 
     private class MemPersistStateChangeListener implements PersistStateChangeListener {
 
