@@ -1,4 +1,4 @@
-package com.github.jonathanperucca.service;
+package com.github.jonathanperucca.exception;
 
 public class BusinessStateMachineException extends RuntimeException {
 

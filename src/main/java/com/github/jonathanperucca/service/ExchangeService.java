@@ -1,7 +1,8 @@
 package com.github.jonathanperucca.service;
 
+import com.github.jonathanperucca.exception.BusinessStateMachineException;
+import com.github.jonathanperucca.handler.PersistStateChangeListener;
 import com.github.jonathanperucca.handler.PersistStateMachineHandler;
-import com.github.jonathanperucca.handler.PersistStateMachineHandler.PersistStateChangeListener;
 import com.github.jonathanperucca.model.Events;
 import com.github.jonathanperucca.model.Exchange;
 import com.github.jonathanperucca.model.States;
@@ -12,38 +13,18 @@ import org.springframework.statemachine.state.State;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import static com.github.jonathanperucca.model.States.READY;
-
 @Service
 public class ExchangeService {
 
     private final PersistStateMachineHandler handler;
-    private final PersistStateChangeListener listener = new MemPersistStateChangeListener();
     private final String exchangeHeader = "exchange";
-
-    private Map<String, Exchange> exchangeDB;
+    private final MapDB mapDB;
 
     @Autowired
-    public ExchangeService(PersistStateMachineHandler handler) {
+    public ExchangeService(PersistStateMachineHandler handler, MapDB mapDB) {
         this.handler = handler;
-        this.handler.addPersistStateChangeListener(listener);
-
-        String uuid = "xch-prd-1";
-        String uuid2 = "xch-prd-2";
-        exchangeDB = new HashMap<>(2);
-        exchangeDB.put(uuid, new Exchange(uuid));
-        exchangeDB.put(uuid2, new Exchange(uuid2));
-    }
-
-    public void onEnterAccept() {
-        System.out.println("ExchangeService : set status = " + READY);
-    }
-
-    public void onExitAccept() {
-        System.out.println("ExchangeService : leaving status " + READY);
+        this.mapDB = mapDB;
+        this.handler.addPersistStateChangeListener(new MemPersistStateChangeListener());
     }
 
     public boolean handleEvent(Message<Events> message) {
@@ -51,17 +32,16 @@ public class ExchangeService {
         try {
             return handler.handleEventWithState(message, exchange.getCurrentState());
         } catch (BusinessStateMachineException e) {
-            System.out.println(e.getMessage());
             return false;
         }
     }
 
-    public void showDB() {
-        exchangeDB.forEach((id, exchange) -> System.out.println("exchange (" + id + ") has state : " + exchange.getCurrentState()));
+    public Exchange getExchange(String uuid) {
+        return mapDB.getExchange(uuid);
     }
 
-    public Exchange getExchange(String uuid) {
-        return exchangeDB.get(uuid);
+    public void showDB() {
+        mapDB.showDB();
     }
 
     private class MemPersistStateChangeListener implements PersistStateChangeListener {
@@ -73,7 +53,7 @@ public class ExchangeService {
                 Exchange exchange = message.getHeaders().get(exchangeHeader, Exchange.class);
 
                 exchange.setCurrentState(state.getId());
-                exchangeDB.put(exchange.getUuid(), exchange);
+                mapDB.putExchange(exchange.getUuid(), exchange);
             }
         }
 

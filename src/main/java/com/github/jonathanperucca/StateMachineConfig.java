@@ -1,11 +1,9 @@
 package com.github.jonathanperucca;
 
+import com.github.jonathanperucca.exception.BusinessStateMachineException;
 import com.github.jonathanperucca.model.Events;
 import com.github.jonathanperucca.model.Exchange;
 import com.github.jonathanperucca.model.States;
-import com.github.jonathanperucca.service.ActionService;
-import com.github.jonathanperucca.service.BusinessStateMachineException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.config.EnableStateMachine;
@@ -20,13 +18,11 @@ import org.springframework.statemachine.state.State;
 
 import static com.github.jonathanperucca.model.Events.*;
 import static com.github.jonathanperucca.model.States.*;
+import static java.util.EnumSet.allOf;
 
 @Configuration
 @EnableStateMachine
 public class StateMachineConfig extends EnumStateMachineConfigurerAdapter<States, Events> {
-
-    @Autowired
-    ActionService actionService;
 
     @Override
     public void configure(StateMachineConfigurationConfigurer<States, Events> config)
@@ -51,11 +47,8 @@ public class StateMachineConfig extends EnumStateMachineConfigurerAdapter<States
     public void configure(StateMachineStateConfigurer<States, Events> states) throws Exception {
         states.withStates()
                 .initial(PENDING)
-                .state(PENDING, actionService.entryAction(), actionService.exitAction())
-                .state(READY)
-                .state(IN_PROGRESS)
-                .state(WAITING_END)
-                .end(WAITING_END);
+                .end(WAITING_END)
+                .states(allOf(States.class));
     }
 
     @Override
