@@ -14,8 +14,11 @@ import org.springframework.statemachine.support.StateMachineInterceptorAdapter;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.util.Assert;
 
+import java.awt.*;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.function.Function;
 
 /**
  * {@code PersistStateMachineHandler} is a recipe which can be used to
@@ -43,24 +46,34 @@ public class PersistStateMachineHandler extends LifecycleObjectSupport {
 	}
 
 	public boolean handleEventWithState(Message<Events> event, States state) {
-		reinitializeTo(state);
-		boolean eventAccepted = stateMachine.sendEvent(event);
+		return reinitializeTo(event)
+				.andThen(this::sendEventToStateMachine)
+				.apply(state);
+	}
+
+
+	private Function<States, Message<Events>> reinitializeTo(Message<Events> event) {
+		return (States state) -> {
+			stateMachine.stop();
+			List<StateMachineAccess<States, Events>> withAllRegions = stateMachine.getStateMachineAccessor()
+																				  .withAllRegions();
+			for (StateMachineAccess<States, Events> a : withAllRegions) {
+				a.resetStateMachine(new DefaultStateMachineContext<>(state, null, null, null));
+			}
+			resetStateMachineErrors();
+			stateMachine.start();
+			return event;
+		};
+	}
+
+	private Boolean sendEventToStateMachine(Message<Events> message) {
+		boolean eventAccepted = stateMachine.sendEvent(message);
 
 		if(!eventAccepted) {
 			throw new BusinessStateMachineException("Event not accepted by state machine");
 		}
 
 		return true;
-	}
-
-	private void reinitializeTo(States state) {
-		stateMachine.stop();
-		List<StateMachineAccess<States, Events>> withAllRegions = stateMachine.getStateMachineAccessor().withAllRegions();
-		for (StateMachineAccess<States, Events> a : withAllRegions) {
-			a.resetStateMachine(new DefaultStateMachineContext<>(state, null, null, null));
-		}
-		resetStateMachineErrors();
-		stateMachine.start();
 	}
 
 	private void resetStateMachineErrors() {
